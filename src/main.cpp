@@ -26,7 +26,7 @@ void setup()
   Serial.println("=== ESP32 + MPU6050 + IR Sensor + LED ===");
 
   // Initialize I2C for MPU6050
-  Wire.begin(21, 22);
+  Wire.begin(21, 22); //SDA, SCL
   if (!mpu.begin())
   {
     Serial.println("MPU6050 not found! Check wiring.");
