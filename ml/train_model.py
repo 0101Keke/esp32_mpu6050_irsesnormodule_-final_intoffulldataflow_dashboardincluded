@@ -1,31 +1,34 @@
-import pandas as pd
+# train_quick.py
+from pip import pandas as pd
+from pip import numpy as np
+import sys
+sys.path.append('C:\Users\kekel\AppData\Local\Programs\Python\Python313\Lib\site-packages')
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import accuracy_score
-import joblib
+from sklearn.ensemble import RandomForestClassifier
+from pip import joblib
 
-# Load data
-df = pd.read_csv("../data/imu_ir_log.csv")
+df = pd.read_csv("data/mpu_ir_log.csv")
 
-# Features and labels
-X = df[["ax","ay","az","gx","gy","gz","ir_value"]]
-y = df["drowsy_state"]
+# ensure columns: accel_x etc... if different, adapt column names
+if 'drowsy_label' not in df.columns:
+    print("No drowsy_label column found. Aborting.")
+    raise SystemExit
 
-# Scale
+X = df[['accel_x','accel_y','accel_z','gyro_x','gyro_y','gyro_z','ir_raw']].values
+y = df['drowsy_label'].values  # 0 = awake, 1 = drowsy
+
 scaler = StandardScaler()
-X_scaled = scaler.fit_transform(X)
+Xs = scaler.fit_transform(X)
 
-# Split
-X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(Xs, y, test_size=0.2, random_state=42, stratify=y)
 
-# Train model
-rf = RandomForestClassifier(n_estimators=100, random_state=42)
-rf.fit(X_train, y_train)
+clf = RandomForestClassifier(n_estimators=200, random_state=42)
+clf.fit(X_train, y_train)
 
-# Evaluate
-print("Accuracy:", accuracy_score(y_test, rf.predict(X_test)))
+print("Train acc:", clf.score(X_train,y_train))
+print("Test acc:", clf.score(X_test,y_test))
 
-# Save
-joblib.dump(scaler, "scaler.pkl")
-joblib.dump(rf, "model.pkl")
+joblib.dump(scaler, "ml/scaler.pkl")
+joblib.dump(clf, "ml/model.pkl")
+print("Saved scaler + model to ml/")

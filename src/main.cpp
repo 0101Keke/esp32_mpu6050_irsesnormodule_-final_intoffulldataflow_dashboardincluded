@@ -2,57 +2,98 @@
 #include <Wire.h>
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
-
 #include <WiFi.h>
 #include <HTTPClient.h>
 
-const char* ssid = "YOUR_WIFI_NAME";
-const char* password = "YOUR_WIFI_PASSWORD";
-const char* serverUrl = "http://192.168.1.100:5000/predict"; // Replace with your PC IP
-
-
 Adafruit_MPU6050 mpu;
 
+const char *ssid = "YOUR_WIFI_NAME";
+const char *password = "YOUR_WIFI_PASSWORD";
+const char *serverUrl = "http://172.16.3.83:5000/predict"; // Replace with your PC IP e.g 192.168.1.100
+
+#define SDA_PIN 21
+#define SCL_PIN 22
 #define IR_PIN 34  // IR sensor OUT pin
 #define LED_RED 25 // Red LED GPIO
+#define BUZZER_BASE_PIN 26
 
 // Drowsiness threshold (tune this value based on testing)
-const int IR_THRESHOLD = 500;
+const int IR_THRESHOLD = 1800; // higher -> closed (depending on the module (500 is the normal one))
+const float NOD_THRESHOLD = 0.20;
+const int SAMPLE_MS = 200;
 
 void setup()
 {
   Serial.begin(115200);
   delay(1000);
-  Serial.println("=== ESP32 + MPU6050 + IR Sensor + LED ===");
+  Serial.println("=== ESP32 + MPU6050 + IR Sensor + RED LED + Buzzer ===");
+
+  pinMode(IR_PIN, INPUT);
+  pinMode(LED_RED, OUTPUT);
+  pinMode(BUZZER_BASE_PIN, OUTPUT);
+  digitalWrite(LED_RED, LOW);
+  digitalWrite(BUZZER_BASE_PIN, LOW);
 
   // Initialize I2C for MPU6050
-  Wire.begin(21, 22); //SDA, SCL
+  Wire.begin(SDA_PIN, SCL_PIN); // SDA, SCL from MPU6050
   if (!mpu.begin())
   {
     Serial.println("MPU6050 not found! Check wiring.");
     while (1)
       delay(1000);
   }
+
+  mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
+  mpu.setGyroRange(MPU6050_RANGE_500_DEG);
+  mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
   Serial.println("MPU6050 initialized.");
 
-  /*WiFi.begin(ssid, password);
-Serial.print("Connecting to WiFi");
-while (WiFi.status() != WL_CONNECTED) {
-  delay(500);
-  Serial.print(".");
-}
-Serial.println("\nWiFi connected.");*/
+  // Connect Wifi
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi");
+  unsigned long start = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - start < 8000)
+  {
+    delay(500);
+    Serial.print(".");
+  }
 
-  pinMode(IR_PIN, INPUT);
+  if (WiFi.status() == WL_CONNECTED)
+  {
+    Serial.println("\nWiFi connected: " + WiFi.localIP().toString());
+  }
+  else
+  {
+    Serial.println("\nWiFi not connected (continuing in offline mode)");
+  }
+
+  /*pinMode(IR_PIN, INPUT);
   pinMode(LED_RED, OUTPUT);
-  digitalWrite(LED_RED, LOW);
+  //digitalWrite(LED_RED, LOW);*/
 
-  // CSV Header
+  // CSV Header for recording
   Serial.println("time_ms,ax,ay,az,gx,gy,gz,ir_value,drowsy_state");
 }
 
+void soundBuzzer(int msOn = 200, int msOff = 200, int repeats = 3)
+{
+  for (int i = 0; i < repeats; i++)
+  {
+    digitalWrite(BUZZER_BASE_PIN, HIGH);
+    digitalWrite(LED_RED, HIGH);
+    delay(msOn);
+    digitalWrite(BUZZER_BASE_PIN, LOW);
+    digitalWrite(LED_RED, LOW);
+    delay(msOff);
+  }
+}
 void loop()
 {
+
+  digitalWrite(LED_RED, HIGH);
+  delay(1000);
+  digitalWrite(LED_RED, LOW);
+  delay(1000);
   // Read MPU
   sensors_event_t accel, gyro, temp;
   mpu.getEvent(&accel, &gyro, &temp);
@@ -60,64 +101,77 @@ void loop()
   // Read IR
   int irVal = analogRead(IR_PIN);
 
+  // Heuristics (instantaneous)
+  bool eyesClosed = (irVal > IR_THRESHOLD);
+  bool nod = (fabs(gyro.gyro.x) > NOD_THRESHOLD || fabs(gyro.gyro.y) > NOD_THRESHOLD);
+
   // Determine drowsiness (IR threshold for blink closure)
-  int drowsy = (irVal < IR_THRESHOLD) ? 1 : 0;
+  // int drowsy = (irVal < IR_THRESHOLD) ? 1 : 0;
+  int drowsy = (eyesClosed || nod) ? 1 : 0;
 
-  // Control LED
-  if (drowsy)
-  {
-    digitalWrite(LED_RED, HIGH);
-  }
-  else
-  {
-    digitalWrite(LED_RED, LOW);
-  }
+  // LED alert
+  // digitalWrite(LED_RED, drowsy ? HIGH : LOW);
 
-  // Print CSV row
+  // print CSV line (for logging / ML dataset)
   Serial.print(millis());
   Serial.print(",");
-  Serial.print(accel.acceleration.x);
+  Serial.print(accel.acceleration.x, 3);
   Serial.print(",");
-  Serial.print(accel.acceleration.y);
+  Serial.print(accel.acceleration.y, 3);
   Serial.print(",");
-  Serial.print(accel.acceleration.z);
+  Serial.print(accel.acceleration.z, 3);
   Serial.print(",");
-  Serial.print(gyro.gyro.x);
+  Serial.print(gyro.gyro.x, 4);
   Serial.print(",");
-  Serial.print(gyro.gyro.y);
+  Serial.print(gyro.gyro.y, 4);
   Serial.print(",");
-  Serial.print(gyro.gyro.z);
+  Serial.print(gyro.gyro.z, 4);
   Serial.print(",");
   Serial.print(irVal);
   Serial.print(",");
   Serial.println(drowsy);
 
-  delay(100); // ~10 Hz sampling
-
- if (WiFi.status() == WL_CONNECTED) {
-  HTTPClient http;
-  http.begin(serverUrl);
-  http.addHeader("Content-Type", "application/json");
-
-  String json = "{";
-  json += "\"ax\":" + String(accel.acceleration.x) + ",";
-  json += "\"ay\":" + String(accel.acceleration.y) + ",";
-  json += "\"az\":" + String(accel.acceleration.z) + ",";
-  json += "\"gx\":" + String(gyro.gyro.x) + ",";
-  json += "\"gy\":" + String(gyro.gyro.y) + ",";
-  json += "\"gz\":" + String(gyro.gyro.z) + ",";
-  json += "\"ir_value\":" + String(irVal);
-  json += "}";
-
-  int httpCode = http.POST(json);
-  if (httpCode > 0) {
-    String payload = http.getString();
-    Serial.println("Server response: " + payload);
-  } else {
-    Serial.println("Error sending POST: " + String(httpCode));
+  // Alert hardware
+  if (drowsy)
+  {
+    // immediate sensory alert
+    soundBuzzer(150, 150, 4);
   }
-  http.end();
-}
+  else
+  {
+    // digitalWrite(LED_RED, LOW);
+    digitalWrite(BUZZER_BASE_PIN, LOW);
+  }
 
+  if (WiFi.status() == WL_CONNECTED)
+  {
+    HTTPClient http;
+    http.begin(serverUrl);
+    http.addHeader("Content-Type", "application/json");
 
+    String json = "{";
+    json += "\"accel_x\":" + String(accel.acceleration.x, 3) + ",";
+    json += "\"accel_y\":" + String(accel.acceleration.y, 3) + ",";
+    json += "\"accel_z\":" + String(accel.acceleration.z, 3) + ",";
+    json += "\"gyro_x\":" + String(gyro.gyro.x, 4) + ",";
+    json += "\"gyro_y\":" + String(gyro.gyro.y, 4) + ",";
+    json += "\"gyro_z\":" + String(gyro.gyro.z, 4) + ",";
+    json += "\"ir_value\":" + String(irVal) + ",";
+    json += "\"drowsy\":" + String(drowsy);
+    json += "}";
+
+    int code = http.POST(json);
+    if (code > 0)
+    {
+      String reply = http.getString();
+      Serial.println("Server reply: " + String(code) + " " + reply);
+    }
+    else
+    {
+      Serial.println("POST failed, code: " + String(code));
+    }
+    http.end();
+  }
+
+  delay(SAMPLE_MS);
 }
