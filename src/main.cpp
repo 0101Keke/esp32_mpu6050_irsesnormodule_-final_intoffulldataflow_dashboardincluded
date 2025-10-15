@@ -5,6 +5,15 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 
+//Writing to csv files
+//=============================================================================
+// #include <fstream>
+// #include <iostream>
+// #include <string>
+// #include <LittleFS.h> // this a little file system mean't to run on the esp32
+
+//=============================================================================
+
 Adafruit_MPU6050 mpu;
 
 const char *ssid = "YOUR_WIFI_NAME";
@@ -73,6 +82,26 @@ void setup()
 
   // CSV Header for recording
   Serial.println("time_ms,ax,ay,az,gx,gy,gz,ir_value,drowsy_state");
+
+  //Printing to the csv file
+  //=============================================================================
+  
+  // Serial.begin(115200); // Or your preferred baud rate
+  // if (!LittleFS.begin()) {
+  //   Serial.println("An Error has occurred while mounting LittleFS");
+  //   return; // Or halt execution depending on your needs
+  // }
+
+  // Serial.println("LittleFS mounted successfully.");
+
+  //   // The rest of your setup code...
+  //   // Optional: write the CSV header only if the file is new
+  //   if (!LittleFS.exists("/mpu_ir_log.csv")) {
+  //       Serial.println("mpu_ir_log.csv");
+  //   }
+  //=============================================================================
+
+
 }
 
 void soundBuzzer(int msOn = 200, int msOff = 200, int repeats = 3)
@@ -130,6 +159,31 @@ void loop()
   Serial.print(irVal);
   Serial.print(",");
   Serial.println(drowsy);
+
+  //Printing to the csv file
+  //=============================================================================
+  
+  // std::ofstream outputFile("/mpu_ir_log.csv", std::ios::app);
+  //  if (!outputFile.is_open()) {
+  //       std::cerr << "Error opening file!" << std::endl;
+  //      return ; // Indicate an error
+  //  }    
+  // String csvLine = String(millis()) + ", " +
+  //                  String(accel.acceleration.x, 3) + ", " +
+  //                  String(accel.acceleration.y, 3) + ", " +
+  //                  String(accel.acceleration.z, 3) + ", " +
+  //                  String(gyro.gyro.x, 4) + ", " +
+  //                  String(gyro.gyro.y, 4) + ", " +
+  //                  String(gyro.gyro.z, 4) + ", " +
+  //                  String(irVal) + ", " +
+  //                  String(drowsy);
+    
+  //  // Write the formatted string to the file
+  //  outputFile << csvLine << std::endl;
+  //  Serial.println("Data logged.");
+  //  outputFile.close();
+  //=============================================================================
+
 
   // Alert hardware
   if (drowsy)
