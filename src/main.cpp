@@ -18,7 +18,7 @@ Adafruit_MPU6050 mpu;
 
   const char *ssid = "BC STUDENTS"; //"DIRECT-BMW 86823" Bmw wifi name
 const char *password = "belgiumcampus"; // "F4pSi12RZgt1" Password for
-const char *serverUrl = "http://172.16.0.95:5000/predict"; // Replace with your PC IP e.g 192.168.1.100 // Joseph  172.16.0.95 // existing 172.16.3.83
+const char *serverUrl = "http://172.16.5.23:8080"; // Replace with your PC IP e.g 192.168.1.100 // Joseph  172.16.0.95 // existing 172.16.3.83 // old "http://172.16.0.95:5000/predict";
 
 #define SDA_PIN 21
 #define SCL_PIN 22
