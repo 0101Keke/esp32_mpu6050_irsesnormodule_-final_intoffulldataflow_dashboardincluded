@@ -16,9 +16,9 @@
 
 Adafruit_MPU6050 mpu;
 
-const char *ssid = "YOUR_WIFI_NAME";
-const char *password = "YOUR_WIFI_PASSWORD";
-const char *serverUrl = "http://172.16.3.83:5000/predict"; // Replace with your PC IP e.g 192.168.1.100
+  const char *ssid = "BC STUDENTS"; //"DIRECT-BMW 86823" Bmw wifi name
+const char *password = "belgiumcampus"; // "F4pSi12RZgt1" Password for
+const char *serverUrl = "http://172.16.0.95:5000/predict"; // Replace with your PC IP e.g 192.168.1.100 // Joseph  172.16.0.95 // existing 172.16.3.83
 
 #define SDA_PIN 21
 #define SCL_PIN 22
@@ -29,7 +29,7 @@ const char *serverUrl = "http://172.16.3.83:5000/predict"; // Replace with your 
 // Drowsiness threshold (tune this value based on testing)
 const int IR_THRESHOLD = 1800; // higher -> closed (depending on the module (500 is the normal one))
 const float NOD_THRESHOLD = 0.20;
-const int SAMPLE_MS = 200;
+const int SAMPLE_MS = 10;
 
 void setup()
 {
@@ -106,15 +106,25 @@ void setup()
 
 void soundBuzzer(int msOn = 200, int msOff = 200, int repeats = 3)
 {
-  for (int i = 0; i < repeats; i++)
-  {
-    digitalWrite(BUZZER_BASE_PIN, HIGH);
+  ledcSetup(0, 3000, 8);
+  ledcAttachPin(BUZZER_BASE_PIN, 0);
+  for (int i = 0; i < repeats; i++) {
+    ledcWrite(0, 128); // 50% duty cycle
     digitalWrite(LED_RED, HIGH);
     delay(msOn);
-    digitalWrite(BUZZER_BASE_PIN, LOW);
+    ledcWrite(0, 0); // Off
     digitalWrite(LED_RED, LOW);
     delay(msOff);
   }
+  // for (int i = 0; i < repeats; i++)
+  // {
+  //   digitalWrite(BUZZER_BASE_PIN, HIGH);
+  //   digitalWrite(LED_RED, HIGH);
+  //   delay(msOn);
+  //   digitalWrite(BUZZER_BASE_PIN, LOW);
+  //   digitalWrite(LED_RED, LOW);
+  //   delay(msOff);
+  // }
 }
 void loop()
 {
